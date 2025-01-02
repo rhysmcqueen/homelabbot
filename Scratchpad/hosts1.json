@@ -1,0 +1,14 @@
+{
+    "poseidon.host": "192.168.1.2",
+    "ares.host": "192.168.1.3",
+    "truenas.host": "192.168.1.4",
+    "mac.host": "192.168.1.7",
+    "idrac.host": "192.168.1.8",
+    "jj.host": "192.168.1.9",
+    "pterodactyl.host": "192.168.1.11",
+    "gameserver-node-01.host": "192.168.1.12",
+    "dockervm1.host": "192.168.1.17",
+    "pi.host": "192.168.1.85",
+    "juniper.host": "192.168.1.254"
+  }
+  

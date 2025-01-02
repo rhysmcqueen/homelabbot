@@ -1,0 +1,95 @@
+{
+    "poseidon.host": {
+        "host_name": "poseidon.host",
+        "ip": "192.168.1.2",
+        "role": [
+            "VM",
+            "Ubuntu"
+        ],
+        "FQDN": "posedion.local.mcqueenlab.net"
+    },
+    "ares.host": {
+        "host_name": "ares.host",
+        "ip": "192.168.1.3",
+        "role": [
+            "VM",
+            "Truenas"
+        ]
+    },
+    "truenas.host": {
+        "ip": "192.168.1.4",
+        "mac": "CE:62:3C:82:0F:F7",
+        "role": [
+            "TrueNas",
+            " Storage",
+            " Media"
+        ]
+    },
+    "truenas.1": {
+        "ip": "1.2.3.4",
+        "role": [
+            "Hypervisor",
+            "Storage",
+            "VM",
+            "Compute"
+        ]
+    },
+    "asfasf": {
+        "ip": "1231.1241.124.124",
+        "role": [
+            "Hypervisor"
+        ]
+    },
+    "fdsa": {
+        "ip": "sdfas",
+        "role": [
+            "Hypervisor"
+        ]
+    },
+    "afsd": {
+        "ip": "sdf",
+        "role": [
+            "sdaf"
+        ]
+    },
+    "Bronchitus": {
+        "ip": "429.69.69.429",
+        "role": [
+            "Hypervisor"
+        ]
+    },
+    "dockervm1.host": {
+        "ip": "192.168.1.17",
+        "role": [
+            "VM"
+        ]
+    },
+    "pfsense.cal": {
+        "ip": "10.0.1.1",
+        "mac": "N/A",
+        "role": [
+            "VM"
+        ]
+    },
+    "pfsense.node": {
+        "ip": "pfsense.node",
+        "mac": "n",
+        "role": [
+            "Router"
+        ]
+    },
+    "vm2.cal": {
+        "ip": "10.0.1.7",
+        "mac": "ff:ff:ff:ff:ff",
+        "role": [
+            "VM"
+        ]
+    },
+    "mac-pro.local.mcqueenlab.net": {
+        "ip": "192.168.1.6",
+        "mac": "00:3e:e1:be:29:ea",
+        "role": [
+            "VM"
+        ]
+    }
+}
