@@ -11,3 +11,9 @@ At the moment it does the follow (in a mostly working fasion)
 
 
   
+What else could I add:
+* Proxmox commands via the API?
+* Terraform commands to deploy stacks?
+* Ansible commands?
+* If you look in the scratch pad folder you will see I made the discord bot act as a SSH client... Cool idea but supper insecure.
+  
