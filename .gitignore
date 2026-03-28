@@ -1,2 +1,32 @@
-# .gitignore
+# Secrets
 .env
+
+# Database and logs (runtime data)
+data/*.db
+data/*.log
+data/*.log.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,8 @@
+services:
+  homelabbot:
+    image: ghcr.io/rhysmcqueen/homelabbot:latest
+    container_name: homelabbot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data

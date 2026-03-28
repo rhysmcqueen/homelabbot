@@ -1,0 +1,12 @@
+.env
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/*.pyo
+Scratchpad/
+main_BOT.py
+hosts.json
+sample.env
+data/
+*.md
