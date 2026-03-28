@@ -3,7 +3,10 @@ import time
 
 import nextcord
 from nextcord.ext import commands
-from nextcord.ext.application_checks import ApplicationCheckFailure
+try:
+    from nextcord.ext.application_checks import ApplicationCheckFailure
+except ImportError:
+    from nextcord.ext.application_checks import ApplicationCheckAnyFailure as ApplicationCheckFailure
 
 from bot.config import BOT_TOKEN
 from bot.db import init_db
@@ -60,9 +63,7 @@ class HomelabBot(commands.Bot):
 def main() -> None:
     setup_logging()
     bot = HomelabBot()
-    # log_handler=None tells nextcord not to configure its own logging,
-    # since we've already set up our own handlers above.
-    bot.run(BOT_TOKEN, log_handler=None)
+    bot.run(BOT_TOKEN)
 
 
 if __name__ == "__main__":
