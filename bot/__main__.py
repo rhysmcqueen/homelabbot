@@ -31,7 +31,9 @@ class HomelabBot(commands.Bot):
         await self.add_cog(ToolsCog(self))
         await self.add_cog(AdminCog(self))
         logger.info("All cogs loaded successfully")
-        await self.tree.sync(guild=discord.Object(id=GUILD_ID))
+        guild = discord.Object(id=GUILD_ID)
+        self.tree.copy_global_to(guild=guild)
+        await self.tree.sync(guild=guild)
         logger.info("Slash commands synced to guild %s", GUILD_ID)
 
     async def on_ready(self) -> None:
