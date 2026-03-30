@@ -3,10 +3,10 @@ import logging
 from typing import Optional
 
 import aiohttp
-import nextcord
-from nextcord.ext import commands
+import discord
+from discord import app_commands
+from discord.ext import commands
 
-from bot.config import GUILD_ID
 from bot.db import add_plug, get_all_plugs, get_plug, remove_plug
 from bot.permissions import is_management
 
@@ -19,11 +19,11 @@ POWER_ACTIONS: dict[str, str] = {
     "reboot": "Restart 1",
 }
 
-POWER_CHOICES = {
-    "Power On": "on",
-    "Power Off": "off",
-    "Reboot": "reboot",
-}
+POWER_CHOICES = [
+    app_commands.Choice(name="Power On", value="on"),
+    app_commands.Choice(name="Power Off", value="off"),
+    app_commands.Choice(name="Reboot", value="reboot"),
+]
 
 
 class PowerCog(commands.Cog, name="Power"):
@@ -44,19 +44,19 @@ class PowerCog(commands.Cog, name="Power"):
     # /plug  (manage smart plug registry)
     # ------------------------------------------------------------------
 
-    @nextcord.slash_command(
-        name="plug", description="Manage registered smart plugs", guild_ids=[GUILD_ID]
-    )
-    async def plug(self, interaction: nextcord.Interaction):
-        pass
+    plug = app_commands.Group(name="plug", description="Manage registered smart plugs")
 
-    @plug.subcommand(name="add", description="Register a new Tasmota smart plug")
+    @plug.command(name="add", description="Register a new Tasmota smart plug")
     @is_management()
+    @app_commands.describe(
+        name="Friendly name for the plug",
+        ip="IP address of the Tasmota device",
+    )
     async def plug_add(
         self,
-        interaction: nextcord.Interaction,
-        name: str = nextcord.SlashOption(description="Friendly name for the plug"),
-        ip: str = nextcord.SlashOption(description="IP address of the Tasmota device"),
+        interaction: discord.Interaction,
+        name: str,
+        ip: str,
     ):
         await interaction.response.defer(ephemeral=True)
         try:
@@ -70,14 +70,13 @@ class PowerCog(commands.Cog, name="Power"):
                 f"Failed to register plug: {exc}", ephemeral=True
             )
 
-    @plug.subcommand(name="remove", description="Remove a registered smart plug")
+    @plug.command(name="remove", description="Remove a registered smart plug")
     @is_management()
+    @app_commands.describe(name="Plug to remove")
     async def plug_remove(
         self,
-        interaction: nextcord.Interaction,
-        name: str = nextcord.SlashOption(
-            description="Plug to remove", autocomplete=True
-        ),
+        interaction: discord.Interaction,
+        name: str,
     ):
         await interaction.response.defer(ephemeral=True)
         removed = await remove_plug(name)
@@ -91,16 +90,19 @@ class PowerCog(commands.Cog, name="Power"):
                 f"No plug named **{name}** found.", ephemeral=True
             )
 
-    @plug_remove.on_autocomplete("name")
+    @plug_remove.autocomplete("name")
     async def _plug_remove_autocomplete(
-        self, interaction: nextcord.Interaction, name: str
-    ):
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
         plugs = await get_all_plugs()
-        choices = [p["name"] for p in plugs if name.lower() in p["name"].lower()]
-        await interaction.response.send_autocomplete(choices[:25])
+        return [
+            app_commands.Choice(name=p["name"], value=p["name"])
+            for p in plugs
+            if current.lower() in p["name"].lower()
+        ][:25]
 
-    @plug.subcommand(name="list", description="List all registered smart plugs")
-    async def plug_list(self, interaction: nextcord.Interaction):
+    @plug.command(name="list", description="List all registered smart plugs")
+    async def plug_list(self, interaction: discord.Interaction):
         await interaction.response.defer()
         plugs = await get_all_plugs()
         if not plugs:
@@ -108,7 +110,7 @@ class PowerCog(commands.Cog, name="Power"):
                 "No smart plugs registered. Use `/plug add` to register one."
             )
             return
-        embed = nextcord.Embed(title="Smart Plugs", color=nextcord.Color.orange())
+        embed = discord.Embed(title="Smart Plugs", color=discord.Color.orange())
         for p in plugs:
             embed.add_field(name=p["name"], value=f"`{p['ip']}`", inline=True)
         await interaction.followup.send(embed=embed)
@@ -117,22 +119,21 @@ class PowerCog(commands.Cog, name="Power"):
     # /power  (send power commands to a plug)
     # ------------------------------------------------------------------
 
-    @nextcord.slash_command(
+    @app_commands.command(
         name="power",
         description="Send a power command to a registered smart plug",
-        guild_ids=[GUILD_ID],
     )
     @is_management()
+    @app_commands.describe(
+        device="Smart plug name",
+        action="Power action to send",
+    )
+    @app_commands.choices(action=POWER_CHOICES)
     async def power(
         self,
-        interaction: nextcord.Interaction,
-        device: str = nextcord.SlashOption(
-            description="Smart plug name", autocomplete=True
-        ),
-        action: str = nextcord.SlashOption(
-            description="Power action to send",
-            choices=POWER_CHOICES,
-        ),
+        interaction: discord.Interaction,
+        device: str,
+        action: app_commands.Choice[str],
     ):
         await interaction.response.defer(ephemeral=True)
 
@@ -144,14 +145,15 @@ class PowerCog(commands.Cog, name="Power"):
             )
             return
 
-        tasmota_cmd = POWER_ACTIONS[action]
+        action_value = action.value
+        tasmota_cmd = POWER_ACTIONS[action_value]
         encoded_cmd = tasmota_cmd.replace(" ", "%20")
         url = f"http://{plug['ip']}/cm?cmnd={encoded_cmd}"
 
         logger.info(
             "%s sending power '%s' to %s (%s)",
             interaction.user,
-            action,
+            action_value,
             device,
             plug["ip"],
         )
@@ -188,10 +190,13 @@ class PowerCog(commands.Cog, name="Power"):
                 f"Command failed: {exc}", ephemeral=True
             )
 
-    @power.on_autocomplete("device")
+    @power.autocomplete("device")
     async def _power_device_autocomplete(
-        self, interaction: nextcord.Interaction, device: str
-    ):
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
         plugs = await get_all_plugs()
-        choices = [p["name"] for p in plugs if device.lower() in p["name"].lower()]
-        await interaction.response.send_autocomplete(choices[:25])
+        return [
+            app_commands.Choice(name=p["name"], value=p["name"])
+            for p in plugs
+            if current.lower() in p["name"].lower()
+        ][:25]

@@ -3,11 +3,11 @@ import logging
 import platform
 from typing import Optional
 
-import nextcord
-from nextcord.ext import commands
+import discord
+from discord import app_commands
+from discord.ext import commands
 from wakeonlan import send_magic_packet
 
-from bot.config import GUILD_ID
 from bot.db import get_all_hosts, get_host
 from bot.permissions import is_management
 
@@ -59,15 +59,14 @@ class NetworkCog(commands.Cog, name="Network"):
     # /ping
     # ------------------------------------------------------------------
 
-    @nextcord.slash_command(
-        name="ping", description="Ping a host to check reachability", guild_ids=[GUILD_ID]
+    @app_commands.command(
+        name="ping", description="Ping a host to check reachability",
     )
+    @app_commands.describe(host="Host name from DB, or a raw IP address")
     async def ping(
         self,
-        interaction: nextcord.Interaction,
-        host: str = nextcord.SlashOption(
-            description="Host name from DB, or a raw IP address", autocomplete=True
-        ),
+        interaction: discord.Interaction,
+        host: str,
     ):
         await interaction.response.defer()
 
@@ -78,10 +77,10 @@ class NetworkCog(commands.Cog, name="Network"):
         logger.info("%s pinged %s (%s)", interaction.user, display_name, ip)
 
         success, summary = await _ping(ip)
-        color = nextcord.Color.green() if success else nextcord.Color.red()
+        color = discord.Color.green() if success else discord.Color.red()
         status = "Online" if success else "Offline / Unreachable"
 
-        embed = nextcord.Embed(
+        embed = discord.Embed(
             title=f"Ping: {display_name}",
             color=color,
         )
@@ -92,31 +91,31 @@ class NetworkCog(commands.Cog, name="Network"):
 
         await interaction.followup.send(embed=embed)
 
-    @ping.on_autocomplete("host")
+    @ping.autocomplete("host")
     async def _ping_autocomplete(
-        self, interaction: nextcord.Interaction, host: str
-    ):
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
         hosts = await get_all_hosts()
-        choices = [h["name"] for h in hosts if host.lower() in h["name"].lower()]
-        await interaction.response.send_autocomplete(choices[:25])
+        return [
+            app_commands.Choice(name=h["name"], value=h["name"])
+            for h in hosts
+            if current.lower() in h["name"].lower()
+        ][:25]
 
     # ------------------------------------------------------------------
     # /wakeup
     # ------------------------------------------------------------------
 
-    @nextcord.slash_command(
+    @app_commands.command(
         name="wakeup",
         description="Send a Wake-on-LAN magic packet to a host",
-        guild_ids=[GUILD_ID],
     )
     @is_management()
+    @app_commands.describe(host="Host name (must have a MAC address in the DB)")
     async def wakeup(
         self,
-        interaction: nextcord.Interaction,
-        host: str = nextcord.SlashOption(
-            description="Host name (must have a MAC address in the DB)",
-            autocomplete=True,
-        ),
+        interaction: discord.Interaction,
+        host: str,
     ):
         await interaction.response.defer(ephemeral=True)
 
@@ -153,15 +152,14 @@ class NetworkCog(commands.Cog, name="Network"):
                 f"Failed to send WoL packet: {exc}", ephemeral=True
             )
 
-    @wakeup.on_autocomplete("host")
+    @wakeup.autocomplete("host")
     async def _wakeup_autocomplete(
-        self, interaction: nextcord.Interaction, host: str
-    ):
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
         hosts = await get_all_hosts()
         # Only suggest hosts that have a MAC address registered
-        choices = [
-            h["name"]
+        return [
+            app_commands.Choice(name=h["name"], value=h["name"])
             for h in hosts
-            if h.get("mac") and host.lower() in h["name"].lower()
-        ]
-        await interaction.response.send_autocomplete(choices[:25])
+            if h.get("mac") and current.lower() in h["name"].lower()
+        ][:25]

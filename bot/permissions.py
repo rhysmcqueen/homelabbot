@@ -1,15 +1,15 @@
 import logging
 
-import nextcord
-from nextcord.ext.application_checks import check
+import discord
+from discord import app_commands
 
 from bot.config import MANAGEMENT_ROLE_ID, OWNER_ID
 
 logger = logging.getLogger(__name__)
 
 
-def _log_denied(interaction: nextcord.Interaction, required: str) -> None:
-    cmd = getattr(interaction.application_command, "name", "unknown")
+def _log_denied(interaction: discord.Interaction, required: str) -> None:
+    cmd = interaction.command.name if interaction.command else "unknown"
     logger.warning(
         "Permission denied (%s required): %s (ID: %s) attempted /%s in guild %s",
         required,
@@ -23,19 +23,19 @@ def _log_denied(interaction: nextcord.Interaction, required: str) -> None:
 def is_owner():
     """Restrict command to the bot owner only."""
 
-    async def predicate(interaction: nextcord.Interaction) -> bool:
+    async def predicate(interaction: discord.Interaction) -> bool:
         if interaction.user.id == OWNER_ID:
             return True
         _log_denied(interaction, "owner")
         return False
 
-    return check(predicate)
+    return app_commands.check(predicate)
 
 
 def is_management():
     """Restrict command to the bot owner or members with the management role."""
 
-    async def predicate(interaction: nextcord.Interaction) -> bool:
+    async def predicate(interaction: discord.Interaction) -> bool:
         if interaction.user.id == OWNER_ID:
             return True
         if interaction.guild:
@@ -45,4 +45,4 @@ def is_management():
         _log_denied(interaction, "management")
         return False
 
-    return check(predicate)
+    return app_commands.check(predicate)

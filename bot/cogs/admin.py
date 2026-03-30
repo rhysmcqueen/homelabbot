@@ -3,8 +3,9 @@ import platform
 import sys
 import time
 
-import nextcord
-from nextcord.ext import commands
+import discord
+from discord import app_commands
+from discord.ext import commands
 
 from bot import __version__
 from bot.config import (
@@ -44,27 +45,26 @@ class AdminCog(commands.Cog, name="Admin"):
     # /botinfo
     # ------------------------------------------------------------------
 
-    @nextcord.slash_command(
+    @app_commands.command(
         name="botinfo",
         description="Show bot status, uptime, and statistics",
-        guild_ids=[GUILD_ID],
     )
-    async def botinfo(self, interaction: nextcord.Interaction):
+    async def botinfo(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
         uptime = _format_uptime(time.time() - self.bot.start_time)
         host_count = await get_host_count()
 
         try:
-            import nextcord as _nc
-            nc_version = _nc.__version__
+            import discord as _dc
+            dc_version = _dc.__version__
         except Exception:
-            nc_version = "unknown"
+            dc_version = "unknown"
 
-        embed = nextcord.Embed(
+        embed = discord.Embed(
             title="HomelabBot",
             description="A Discord bot for managing your homelab infrastructure.",
-            color=nextcord.Color.blurple(),
+            color=discord.Color.blurple(),
         )
         embed.add_field(name="Version", value=f"`{__version__}`", inline=True)
         embed.add_field(name="Uptime", value=uptime, inline=True)
@@ -73,7 +73,7 @@ class AdminCog(commands.Cog, name="Admin"):
         embed.add_field(
             name="Python", value=f"`{sys.version.split()[0]}`", inline=True
         )
-        embed.add_field(name="nextcord", value=f"`{nc_version}`", inline=True)
+        embed.add_field(name="discord.py", value=f"`{dc_version}`", inline=True)
         embed.set_footer(
             text=f"Running on {platform.system()} {platform.release()}"
         )
@@ -83,20 +83,19 @@ class AdminCog(commands.Cog, name="Admin"):
     # /setting
     # ------------------------------------------------------------------
 
-    @nextcord.slash_command(
+    @app_commands.command(
         name="setting",
         description="View current bot configuration — owner only",
-        guild_ids=[GUILD_ID],
     )
     @is_owner()
-    async def setting(self, interaction: nextcord.Interaction):
+    async def setting(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
 
-        embed = nextcord.Embed(
+        embed = discord.Embed(
             title="Bot Configuration",
             description="Current runtime configuration. "
             "To change values, update `.env` and restart the bot.",
-            color=nextcord.Color.gold(),
+            color=discord.Color.gold(),
         )
         embed.add_field(name="Guild ID", value=f"`{interaction.guild_id}`", inline=True)
         embed.add_field(name="Owner ID", value=f"`{OWNER_ID}`", inline=True)

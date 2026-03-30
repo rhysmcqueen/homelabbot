@@ -2,10 +2,9 @@ import asyncio
 import logging
 from typing import Optional
 
-import nextcord
-from nextcord.ext import commands
-
-from bot.config import GUILD_ID
+import discord
+from discord import app_commands
+from discord.ext import commands
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +19,11 @@ class ToolsCog(commands.Cog, name="Tools"):
     # /hello
     # ------------------------------------------------------------------
 
-    @nextcord.slash_command(
+    @app_commands.command(
         name="hello",
         description="Health check — confirm the bot is up and responding",
-        guild_ids=[GUILD_ID],
     )
-    async def hello(self, interaction: nextcord.Interaction):
+    async def hello(self, interaction: discord.Interaction):
         await interaction.response.send_message(
             f"Hello, {interaction.user.mention}! I'm alive and ready.",
             ephemeral=True,
@@ -36,23 +34,19 @@ class ToolsCog(commands.Cog, name="Tools"):
     # /timer
     # ------------------------------------------------------------------
 
-    @nextcord.slash_command(
+    @app_commands.command(
         name="timer",
         description=f"Set a countdown timer (1–{MAX_TIMER_MINUTES} minutes)",
-        guild_ids=[GUILD_ID],
+    )
+    @app_commands.describe(
+        minutes=f"Minutes to wait (1–{MAX_TIMER_MINUTES})",
+        label="Optional label for this timer",
     )
     async def timer(
         self,
-        interaction: nextcord.Interaction,
-        minutes: int = nextcord.SlashOption(
-            description=f"Minutes to wait (1–{MAX_TIMER_MINUTES})",
-            min_value=1,
-            max_value=MAX_TIMER_MINUTES,
-        ),
-        label: Optional[str] = nextcord.SlashOption(
-            description="Optional label for this timer",
-            required=False,
-        ),
+        interaction: discord.Interaction,
+        minutes: app_commands.Range[int, 1, MAX_TIMER_MINUTES],
+        label: Optional[str] = None,
     ):
         tag = f" — *{label}*" if label else ""
         await interaction.response.send_message(

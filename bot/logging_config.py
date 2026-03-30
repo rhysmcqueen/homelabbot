@@ -39,5 +39,5 @@ def setup_logging(log_level: str = "", database_path: str = "") -> None:
     root.addHandler(file_handler)
 
     # Reduce noise from third-party libraries
-    for noisy in ("nextcord", "websockets", "aiohttp", "asyncio"):
+    for noisy in ("discord", "websockets", "aiohttp", "asyncio"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
