@@ -1,5 +1,3 @@
-import io
-import json
 import logging
 from typing import Optional
 
@@ -9,13 +7,11 @@ from discord.ext import commands
 
 from bot.db import (
     add_host,
-    export_hosts_as_dict,
     get_all_hosts,
     get_host,
-    import_hosts_from_dict,
     remove_host,
 )
-from bot.permissions import is_management, is_owner
+from bot.permissions import is_management
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +106,7 @@ class HostsCog(commands.Cog, name="Hosts"):
         ip="IPv4 address",
         mac="MAC address for Wake-on-LAN (e.g. AA:BB:CC:DD:EE:FF)",
         fqdn="Fully qualified domain name",
-        roles="Comma-separated roles (e.g. vm,storage,hypervisor)",
+        roles="Comma-separated roles (e.g. vm,storage,Plug)",
     )
     async def host_add(
         self,
@@ -226,60 +222,3 @@ class HostsCog(commands.Cog, name="Hosts"):
             return
         view = HostListView(hosts, interaction.user.id)
         await interaction.followup.send(embed=view.build_embed(), view=view)
-
-    # ------------------------------------------------------------------
-    # /host export
-    # ------------------------------------------------------------------
-
-    @host.command(name="export", description="Export all hosts as a JSON file")
-    @is_management()
-    async def host_export(self, interaction: discord.Interaction):
-        await interaction.response.defer(ephemeral=True)
-        data = await export_hosts_as_dict()
-        json_bytes = json.dumps(data, indent=2).encode("utf-8")
-        file = discord.File(io.BytesIO(json_bytes), filename="hosts_export.json")
-        await interaction.followup.send(
-            f"Exported **{len(data)}** host(s).", file=file, ephemeral=True
-        )
-        logger.info("%s exported %d hosts", interaction.user, len(data))
-
-    # ------------------------------------------------------------------
-    # /host import
-    # ------------------------------------------------------------------
-
-    @host.command(
-        name="import",
-        description="Import hosts from a JSON file — owner only",
-    )
-    @is_owner()
-    @app_commands.describe(file="JSON file to import (hosts.json format)")
-    async def host_import(
-        self,
-        interaction: discord.Interaction,
-        file: discord.Attachment,
-    ):
-        await interaction.response.defer(ephemeral=True)
-        try:
-            content = await file.read()
-            data = json.loads(content)
-            if not isinstance(data, dict):
-                await interaction.followup.send(
-                    "Invalid format: expected a JSON object.", ephemeral=True
-                )
-                return
-            imported, skipped = await import_hosts_from_dict(data)
-            await interaction.followup.send(
-                f"Import complete: **{imported}** host(s) added, **{skipped}** skipped.",
-                ephemeral=True,
-            )
-            logger.info(
-                "%s imported hosts: %d added, %d skipped",
-                interaction.user,
-                imported,
-                skipped,
-            )
-        except json.JSONDecodeError as exc:
-            await interaction.followup.send(f"Invalid JSON: {exc}", ephemeral=True)
-        except Exception as exc:
-            logger.error("Host import failed: %s", exc, exc_info=True)
-            await interaction.followup.send(f"Import failed: {exc}", ephemeral=True)

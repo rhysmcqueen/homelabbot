@@ -31,15 +31,47 @@ async def init_db() -> None:
                 updated_at  TEXT NOT NULL
             )
         """)
-        await db.execute("""
-            CREATE TABLE IF NOT EXISTS smart_plugs (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                name        TEXT UNIQUE NOT NULL COLLATE NOCASE,
-                ip          TEXT NOT NULL,
-                created_at  TEXT NOT NULL,
-                updated_at  TEXT NOT NULL
+
+        # Migrate: import any existing smart_plugs into hosts, then drop the table
+        try:
+            cursor = await db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='smart_plugs'"
             )
-        """)
+            if await cursor.fetchone():
+                plug_cursor = await db.execute("SELECT name, ip, created_at, updated_at FROM smart_plugs")
+                plugs = await plug_cursor.fetchall()
+                for plug_name, plug_ip, created, updated in plugs:
+                    # Check if a host with this name already exists
+                    existing = await db.execute(
+                        "SELECT id FROM hosts WHERE name = ? COLLATE NOCASE", (plug_name,)
+                    )
+                    if not await existing.fetchone():
+                        await db.execute(
+                            """INSERT INTO hosts (name, ip, mac, fqdn, roles, created_at, updated_at)
+                               VALUES (?, ?, NULL, NULL, 'Plug', ?, ?)""",
+                            (plug_name, plug_ip, created, updated),
+                        )
+                        logger.info("Migrated smart plug '%s' to hosts with role 'Plug'", plug_name)
+                    else:
+                        # Host exists — just ensure it has the Plug role
+                        row = await db.execute(
+                            "SELECT roles FROM hosts WHERE name = ? COLLATE NOCASE", (plug_name,)
+                        )
+                        host_row = await row.fetchone()
+                        if host_row:
+                            existing_roles = host_row[0] or ""
+                            if "Plug" not in existing_roles:
+                                new_roles = f"{existing_roles},Plug" if existing_roles else "Plug"
+                                await db.execute(
+                                    "UPDATE hosts SET roles = ? WHERE name = ? COLLATE NOCASE",
+                                    (new_roles, plug_name),
+                                )
+                        logger.info("Smart plug '%s' already exists as host, added Plug role", plug_name)
+                await db.execute("DROP TABLE smart_plugs")
+                logger.info("Migrated smart_plugs table into hosts and dropped it")
+        except Exception as exc:
+            logger.warning("Smart plug migration check failed (safe to ignore): %s", exc)
+
         await db.commit()
     logger.info("Database initialized at %s", DATABASE_PATH)
 
@@ -101,6 +133,15 @@ async def get_all_hosts() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+async def get_hosts_by_role(role: str) -> list[dict]:
+    """Return all hosts that have a specific role."""
+    all_hosts = await get_all_hosts()
+    return [
+        h for h in all_hosts
+        if role.lower() in [r.strip().lower() for r in (h["roles"] or "").split(",") if r.strip()]
+    ]
+
+
 async def update_host(
     name: str,
     ip: Optional[str] = None,
@@ -130,83 +171,3 @@ async def get_host_count() -> int:
         cursor = await db.execute("SELECT COUNT(*) FROM hosts")
         row = await cursor.fetchone()
     return row[0] if row else 0
-
-
-async def import_hosts_from_dict(data: dict) -> tuple[int, int]:
-    """Import hosts from a dict in the legacy hosts.json format.
-
-    Returns (imported_count, skipped_count).
-    """
-    imported = skipped = 0
-    for key, host in data.items():
-        name = host.get("host_name") or key
-        ip = host.get("ip", "")
-        mac = host.get("mac") or None
-        fqdn = host.get("FQDN") or None
-        roles = host.get("role", [])
-        try:
-            await add_host(name, ip, mac, fqdn, roles)
-            imported += 1
-        except Exception as exc:
-            logger.warning("Skipped host %s during import: %s", name, exc)
-            skipped += 1
-    return imported, skipped
-
-
-async def export_hosts_as_dict() -> dict:
-    hosts = await get_all_hosts()
-    result: dict = {}
-    for h in hosts:
-        roles = [r for r in h["roles"].split(",") if r] if h["roles"] else []
-        result[h["name"]] = {
-            "host_name": h["name"],
-            "ip": h["ip"],
-            "mac": h["mac"],
-            "FQDN": h["fqdn"],
-            "role": roles,
-        }
-    return result
-
-
-# ---------------------------------------------------------------------------
-# Smart Plugs
-# ---------------------------------------------------------------------------
-
-async def add_plug(name: str, ip: str) -> None:
-    now = _now()
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute(
-            "INSERT INTO smart_plugs (name, ip, created_at, updated_at) VALUES (?, ?, ?, ?)",
-            (name, ip, now, now),
-        )
-        await db.commit()
-    logger.info("Added smart plug: %s (%s)", name, ip)
-
-
-async def remove_plug(name: str) -> bool:
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        cursor = await db.execute(
-            "DELETE FROM smart_plugs WHERE name = ? COLLATE NOCASE", (name,)
-        )
-        await db.commit()
-        return cursor.rowcount > 0
-
-
-async def get_plug(name: str) -> Optional[dict]:
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            "SELECT * FROM smart_plugs WHERE name = ? COLLATE NOCASE", (name,)
-        )
-        row = await cursor.fetchone()
-    return dict(row) if row else None
-
-
-async def get_all_plugs() -> list[dict]:
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            "SELECT * FROM smart_plugs ORDER BY name COLLATE NOCASE"
-        )
-        rows = await cursor.fetchall()
-    return [dict(r) for r in rows]

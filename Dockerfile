@@ -5,6 +5,9 @@ WORKDIR /app
 # Create a non-root user to run the bot
 RUN useradd -m -u 1000 botuser
 
+# Install system tools (ping for network checks)
+RUN apt-get update && apt-get install -y --no-install-recommends iputils-ping && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies first for better layer caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

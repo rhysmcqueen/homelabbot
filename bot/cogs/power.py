@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from bot.db import add_plug, get_all_plugs, get_plug, remove_plug
+from bot.db import get_host, get_hosts_by_role
 from bot.permissions import is_management
 
 logger = logging.getLogger(__name__)
@@ -41,91 +41,16 @@ class PowerCog(commands.Cog, name="Power"):
             asyncio.create_task(self._session.close())
 
     # ------------------------------------------------------------------
-    # /plug  (manage smart plug registry)
-    # ------------------------------------------------------------------
-
-    plug = app_commands.Group(name="plug", description="Manage registered smart plugs")
-
-    @plug.command(name="add", description="Register a new Tasmota smart plug")
-    @is_management()
-    @app_commands.describe(
-        name="Friendly name for the plug",
-        ip="IP address of the Tasmota device",
-    )
-    async def plug_add(
-        self,
-        interaction: discord.Interaction,
-        name: str,
-        ip: str,
-    ):
-        await interaction.response.defer(ephemeral=True)
-        try:
-            await add_plug(name, ip)
-            await interaction.followup.send(
-                f"Smart plug **{name}** (`{ip}`) registered.", ephemeral=True
-            )
-            logger.info("%s registered plug %s (%s)", interaction.user, name, ip)
-        except Exception as exc:
-            await interaction.followup.send(
-                f"Failed to register plug: {exc}", ephemeral=True
-            )
-
-    @plug.command(name="remove", description="Remove a registered smart plug")
-    @is_management()
-    @app_commands.describe(name="Plug to remove")
-    async def plug_remove(
-        self,
-        interaction: discord.Interaction,
-        name: str,
-    ):
-        await interaction.response.defer(ephemeral=True)
-        removed = await remove_plug(name)
-        if removed:
-            await interaction.followup.send(
-                f"Plug **{name}** removed.", ephemeral=True
-            )
-            logger.info("%s removed plug %s", interaction.user, name)
-        else:
-            await interaction.followup.send(
-                f"No plug named **{name}** found.", ephemeral=True
-            )
-
-    @plug_remove.autocomplete("name")
-    async def _plug_remove_autocomplete(
-        self, interaction: discord.Interaction, current: str
-    ) -> list[app_commands.Choice[str]]:
-        plugs = await get_all_plugs()
-        return [
-            app_commands.Choice(name=p["name"], value=p["name"])
-            for p in plugs
-            if current.lower() in p["name"].lower()
-        ][:25]
-
-    @plug.command(name="list", description="List all registered smart plugs")
-    async def plug_list(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        plugs = await get_all_plugs()
-        if not plugs:
-            await interaction.followup.send(
-                "No smart plugs registered. Use `/plug add` to register one."
-            )
-            return
-        embed = discord.Embed(title="Smart Plugs", color=discord.Color.orange())
-        for p in plugs:
-            embed.add_field(name=p["name"], value=f"`{p['ip']}`", inline=True)
-        await interaction.followup.send(embed=embed)
-
-    # ------------------------------------------------------------------
-    # /power  (send power commands to a plug)
+    # /power  (send power commands to a host with the "Plug" role)
     # ------------------------------------------------------------------
 
     @app_commands.command(
         name="power",
-        description="Send a power command to a registered smart plug",
+        description="Send a power command to a Tasmota smart plug (hosts with 'Plug' role)",
     )
     @is_management()
     @app_commands.describe(
-        device="Smart plug name",
+        device="Host name (must have the 'Plug' role)",
         action="Power action to send",
     )
     @app_commands.choices(action=POWER_CHOICES)
@@ -137,10 +62,20 @@ class PowerCog(commands.Cog, name="Power"):
     ):
         await interaction.response.defer(ephemeral=True)
 
-        plug = await get_plug(device)
-        if not plug:
+        host = await get_host(device)
+        if not host:
             await interaction.followup.send(
-                f"No plug named **{device}** found. Register it with `/plug add`.",
+                f"No host named **{device}** found.",
+                ephemeral=True,
+            )
+            return
+
+        # Check the host has the Plug role
+        roles = [r.strip().lower() for r in (host["roles"] or "").split(",") if r.strip()]
+        if "plug" not in roles:
+            await interaction.followup.send(
+                f"Host **{device}** doesn't have the **Plug** role. "
+                "Add the role with `/host add` or update it first.",
                 ephemeral=True,
             )
             return
@@ -148,14 +83,14 @@ class PowerCog(commands.Cog, name="Power"):
         action_value = action.value
         tasmota_cmd = POWER_ACTIONS[action_value]
         encoded_cmd = tasmota_cmd.replace(" ", "%20")
-        url = f"http://{plug['ip']}/cm?cmnd={encoded_cmd}"
+        url = f"http://{host['ip']}/cm?cmnd={encoded_cmd}"
 
         logger.info(
             "%s sending power '%s' to %s (%s)",
             interaction.user,
             action_value,
             device,
-            plug["ip"],
+            host["ip"],
         )
 
         try:
@@ -177,7 +112,7 @@ class PowerCog(commands.Cog, name="Power"):
                     )
         except aiohttp.ClientConnectorError:
             await interaction.followup.send(
-                f"Could not reach **{device}** at `{plug['ip']}`. Is it online?",
+                f"Could not reach **{device}** at `{host['ip']}`. Is it online?",
                 ephemeral=True,
             )
         except asyncio.TimeoutError:
@@ -194,7 +129,7 @@ class PowerCog(commands.Cog, name="Power"):
     async def _power_device_autocomplete(
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[str]]:
-        plugs = await get_all_plugs()
+        plugs = await get_hosts_by_role("Plug")
         return [
             app_commands.Choice(name=p["name"], value=p["name"])
             for p in plugs
