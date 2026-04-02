@@ -12,6 +12,7 @@ from bot.cogs.admin import AdminCog
 from bot.cogs.hosts import HostsCog
 from bot.cogs.network import NetworkCog
 from bot.cogs.power import PowerCog
+from bot.cogs.proxmox import ProxmoxCog
 from bot.cogs.tools import ToolsCog
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ class HomelabBot(commands.Bot):
         await self.add_cog(NetworkCog(self))
         await self.add_cog(PowerCog(self))
         await self.add_cog(ToolsCog(self))
+        await self.add_cog(ProxmoxCog(self))
         await self.add_cog(AdminCog(self))
         logger.info("All cogs loaded successfully")
         guild = discord.Object(id=GUILD_ID)
